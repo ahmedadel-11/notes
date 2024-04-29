@@ -1,8 +1,61 @@
-You can create an endpoint that takes a `studentId` as a parameter and returns a list of `Group` objects that the student is registered in. Here's an example:
+Here is a more detailed example of how you can implement the endpoint:
+
+**IRegistrationRepository interface**
+```
+using HTI.Core.Entities;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace HTI.Core.Repositories
+{
+    public interface IRegistrationRepository
+    {
+        Task<IEnumerable<Registration>> GetRegistrationsByStudentId(int studentId);
+        Task<IEnumerable<Group>> GetGroupsByIds(IEnumerable<int> groupIds);
+    }
+}
+```
+**RegistrationRepository implementation**
+```
+using HTI.Core.Entities;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+
+namespace HTI.Infrastructure.Repositories
+{
+    public class RegistrationRepository : IRegistrationRepository
+    {
+        private readonly DbContext _context;
+
+        public RegistrationRepository(DbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<IEnumerable<Registration>> GetRegistrationsByStudentId(int studentId)
+        {
+            return await _context.Registrations
+                .Where(r => r.StudentId == studentId)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Group>> GetGroupsByIds(IEnumerable<int> groupIds)
+        {
+            return await _context.Groups
+                .Where(g => groupIds.Contains(g.GroupId))
+                .ToListAsync();
+        }
+    }
+}
+```
+**RegistrationsController**
 ```
 using Microsoft.AspNetCore.Mvc;
 using HTI.Core.Entities;
-using HTI.Core.Repositories; // assume you have a repository for registrations
+using HTI.Core.Repositories;
+using System.Threading.Tasks;
 
 namespace HTI.Api.Controllers
 {
@@ -18,25 +71,54 @@ namespace HTI.Api.Controllers
         }
 
         [HttpGet("student/{studentId}")]
-        public IActionResult GetGroupsByStudentId(int studentId)
+        public async Task<IActionResult> GetGroupsByStudentId(int studentId)
         {
-            var registrations = _registrationRepository.GetRegistrationsByStudentId(studentId);
+            var registrations = await _registrationRepository.GetRegistrationsByStudentId(studentId);
             var groupIds = registrations.Select(r => r.GroupId).Distinct();
-            var groups = _registrationRepository.GetGroupsByIds(groupIds);
+            var groups = await _registrationRepository.GetGroupsByIds(groupIds);
 
             return Ok(groups);
         }
     }
 }
 ```
-In this example, we're using a repository pattern to encapsulate the data access logic. The `IRegistrationRepository` interface would have methods like `GetRegistrationsByStudentId` and `GetGroupsByIds` that return the relevant data.
+**Startup.cs (add repository and controller to DI container)**
+```
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using HTI.Infrastructure.Repositories;
+using HTI.Api.Controllers;
 
-The `GetGroupsByStudentId` method takes a `studentId` parameter, retrieves the registrations for that student, extracts the unique `GroupId`s from the registrations, and then retrieves the corresponding `Group` objects using the `GetGroupsByIds` method.
+namespace HTI.Api
+{
+    public class Startup
+    {
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddDbContext<MyDbContext>(); // assume you have a DbContext class
+            services.AddTransient<IRegistrationRepository, RegistrationRepository>();
+            services.AddControllers();
+        }
 
-Finally, the method returns a list of `Group` objects in the response.
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            app.UseRouting();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
+        }
+    }
+}
+```
+In this example, we have:
 
-You can then call this endpoint by sending a GET request to `api/registrations/student/{studentId}`, replacing `{studentId}` with the actual student ID.
+* An `IRegistrationRepository` interface that defines two methods: `GetRegistrationsByStudentId` and `GetGroupsByIds`.
+* A `RegistrationRepository` class that implements the interface using Entity Framework Core to retrieve data from the database.
+* A `RegistrationsController` class that uses the repository to retrieve the registrations for a given student ID, extracts the unique group IDs, and then retrieves the corresponding group objects.
+* In the `Startup.cs` file, we add the repository and controller to the DI container.
 
-For example, if you have a student with ID 123, you would call `api/registrations/student/123` and the endpoint would return a list of `Group` objects that the student is registered in.
+When you call the `api/registrations/student/{studentId}` endpoint, the `GetGroupsByStudentId` method will be executed, which will retrieve the registrations for the given student ID, extract the group IDs, and then retrieve the corresponding group objects. The resulting list of group objects will be returned in the response.
 
-Note that this assumes you have a repository implementation that can retrieve the data from the database. You'll need to implement the `IRegistrationRepository` interface and provide the necessary logic to retrieve the data.
+Note that this is just a simple example, and you may want to add error handling, caching, and other features depending on your specific requirements.
