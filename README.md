@@ -1,4 +1,4 @@
-Here is a more detailed example of how you can implement the endpoint:
+Here is the updated code:
 
 **IRegistrationRepository interface**
 ```
@@ -37,7 +37,7 @@ namespace HTI.Infrastructure.Repositories
         public async Task<IEnumerable<Registration>> GetRegistrationsByStudentId(int studentId)
         {
             return await _context.Registrations
-                .Where(r => r.StudentId == studentId)
+                .Where(r => r.StudentId == studentId && r.IsOpen == true)
                 .ToListAsync();
         }
 
@@ -112,13 +112,6 @@ namespace HTI.Api
     }
 }
 ```
-In this example, we have:
+In this updated code, I added a filter to the `GetRegistrationsByStudentId` method in the `RegistrationRepository` class to only retrieve registrations where `IsOpen` is `true`. This ensures that only open registrations are considered when retrieving the group IDs.
 
-* An `IRegistrationRepository` interface that defines two methods: `GetRegistrationsByStudentId` and `GetGroupsByIds`.
-* A `RegistrationRepository` class that implements the interface using Entity Framework Core to retrieve data from the database.
-* A `RegistrationsController` class that uses the repository to retrieve the registrations for a given student ID, extracts the unique group IDs, and then retrieves the corresponding group objects.
-* In the `Startup.cs` file, we add the repository and controller to the DI container.
-
-When you call the `api/registrations/student/{studentId}` endpoint, the `GetGroupsByStudentId` method will be executed, which will retrieve the registrations for the given student ID, extract the group IDs, and then retrieve the corresponding group objects. The resulting list of group objects will be returned in the response.
-
-Note that this is just a simple example, and you may want to add error handling, caching, and other features depending on your specific requirements.
+The rest of the code remains the same. When you call the `api/registrations/student/{studentId}` endpoint, the `GetGroupsByStudentId` method will be executed, which will retrieve the open registrations for the given student ID, extract the unique group IDs, and then retrieve the corresponding group objects. The resulting list of group objects will be returned in the response.
